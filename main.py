@@ -10,7 +10,7 @@ from machine import Pin, reset
 # GPS VCC --> ESP32 3v3
 # GPS GND --> ESP32 GND
 # GPS TX  --> ESP32 GPIO 16
-import time # import time.time.sleep_ms, time.sleep, time.ticks_ms
+import time # import sleep_ms, time.sleep, time.ticks_ms
 import neopixel
 from umqtt_robust2 import mqtt_sub_feedname, mqtt_sub_feedname2, c, sub_cb 
 # aktuator vibrator, G-pin på GND, V-pin på 3v3, S-pin på 2
@@ -47,13 +47,13 @@ offsideTest = 0
 
 # forsøg på at implementere non-blocking delay
 currentTime = 0.000 # variable til at holde styr på tid
-intervalMain = 10000  # intervallet der skal ske noget
+intervalMain = 9000  # intervallet der skal ske noget
 previousTimeMain = 0  # sidste gang der skete noget
 # vores offside non-block delay variabler
-intervalOffside = 11000
+intervalOffside = 9000
 previousTimeOffside = 0
 # vores netværk skanner non-block delay
-intervalNet = 12000
+intervalNet = 10000
 previousTimeNet = 0
 
 #vores reset interval
@@ -96,15 +96,15 @@ while True:
             print(pretty_json)
             #ændre rssi filen fra et -tal til et normal tal.
             rssifloat = float(pretty_json)
-            rssifloat3 = rssifloat * -1
-            print(rssifloat3)
-        
-               
+            rssifloat3 = rssifloat * -1.0
+            print(rssifloat3)  
         
         if currentTime - previousTimeMain >= intervalMain:
             previousTimeMain = currentTime
-            gpsData = GPSfunk.main()
+            led.clear()
             led.uploading()
+            gpsData = GPSfunk.main()
+            time.sleep(2)
             #posData = str(gpsData[0])
             #print(posData)
             lib.c.publish(topic=mapFeed, msg=gpsData[0])
@@ -117,7 +117,7 @@ while True:
             #print(gpsData[1])
             GPSlist.append(float(gpsData[1]))
             GPSlist.append(float(gpsData[2]))
-            print(GPSlist)
+            print("egne gps coord ",GPSlist)
             count +=1
 
             if count >= 1:
@@ -134,10 +134,7 @@ while True:
             distanceforsvar = mqtt_sub_feedname
             rssi = mqtt_sub_feedname2
             
-            
-            
             #Printer lib.besked, som er den besked vi får fra adafruit fra GPS
-            
             print(lib.besked)
             print('Forsvars er ',lib.besked,'m væk')
             
@@ -145,7 +142,6 @@ while True:
             print(lib.besked2)
             print('forsvars er ',lib.besked2, 'dBm væk')
                         
-            
             if lib.besked != "":
                 fA = float(lib.besked)
                 print(fA, type(fA))
@@ -154,6 +150,7 @@ while True:
                     print(fA, distance,'DET VIRKER!')
                 else:
                     offside = False
+            
 #går i offside hvis rssi3 er større end rssifloat3 (laver også rssi værdien om til et normalt tal i stedet for et -tal
             if lib.besked2 != "":
                 rssi = float(lib.besked2)
@@ -162,28 +159,32 @@ while True:
                 if rssifloat3 < rssi3:
                     offside = True
                     print(rssifloat3, rssi3, 'DET VIRKER!')
-                    
-            
-
-            ledNormBack = True
+            #ledNormBack = True
 
         if offside == True and currentTime - previousTimeOffside >= intervalOffside:
             previousTimeOffside = currentTime
+            #led.offside()
+            import neopixel
+            n = 12
+            p = 17
+            np = neopixel.NeoPixel(Pin(p), n)
+            for i in range(n):
+                np[i] = (44, 0, 0)
+                np.write()
             vibrator.value(1)
-            led.offside()
-            ledNormBack = True
+            #led.clear()
+            #led.offside()
+            #ledNormBack = True
             print("Potentiel offside pos")
-            time.sleep(0.5)
+            time.sleep(2)
             vibrator.value(0)
-            
-            print(offsideTest)
-
-       
+            #print(offsideTest)
 
         if ledNormBack == True:
             ledNormBack = False
             print("back to normal")
             led.power_on()
+            
         #disconnecter fra wifi, og scanner efter wifi's
         if currentTime - previousTimeNet >= intervalNet:
             previousTimeNet = currentTime
