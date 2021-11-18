@@ -29,7 +29,7 @@ def uploading():
     
 def offside():
     for i in range(n):
-        np[i] = (29, 20, 0)
+        np[i] = (44, 0, 0)
         np.write()
     print("Offside")
 

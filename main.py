@@ -12,7 +12,7 @@ from machine import Pin, reset
 # GPS TX  --> ESP32 GPIO 16
 import time # import time.time.sleep_ms, time.sleep, time.ticks_ms
 import neopixel
-
+from umqtt_robust2 import mqtt_sub_feedname, mqtt_sub_feedname2, c, sub_cb 
 # aktuator vibrator, G-pin på GND, V-pin på 3v3, S-pin på 2
 vibrator = Pin(2, Pin.OUT, value=0)
 
@@ -28,6 +28,8 @@ led = led_ring_funcs # variable til lettere at håndtere LED funktions bibliotek
 mapFeed = bytes('{:s}/feeds/{:s}'.format(b'GRP4', b'mapfeed2/csv'), 'utf-8')
 # opret en ny feed kaldet speed_gps indo på io.adafruit
 speedFeed = bytes('{:s}/feeds/{:s}'.format(b'GRP4', b'speedfeed2/csv'), 'utf-8')
+#Rssi feed
+rssiFeed = bytes('{:s}/feeds/{:s}'.format(b'GRP4', b'rssi/csv'), 'utf-8')
 
 # Variabler til at holde styr på om LED funktioner er sket
 startUp = False
@@ -86,13 +88,19 @@ while True:
  
         if currentTime - previousTimeOpen >= intervalOpen:
             previousTimeOpen = currentTime
-            #åben data_rssi.ujson filen
+            #åber data_rssi.ujson filen.
             a_file = open("data_rssi.ujson", "r")
             a_json = ujson.load(a_file)
             pretty_json = ujson.dumps(a_json,)
             a_file.close()
             print(pretty_json)
-
+            #ændre rssi filen fra et -tal til et normal tal.
+            rssifloat = float(pretty_json)
+            rssifloat3 = rssifloat * -1
+            print(rssifloat3)
+        
+               
+        
         if currentTime - previousTimeMain >= intervalMain:
             previousTimeMain = currentTime
             gpsData = GPSfunk.main()
@@ -122,19 +130,42 @@ while True:
                 distance = formel.afstand(GPScoord1, GPScoord2)
                 print(distance)
 
-            forsvarAfstand = lib.besked
-            print("Forsvaren er: ", forsvarAfstand, "m væk")
-
-            if forsvarAfstand != "":
-                fA = float(forsvarAfstand)
+            #forsvarAfstand = lib.besked
+            distanceforsvar = mqtt_sub_feedname
+            rssi = mqtt_sub_feedname2
+            
+            
+            
+            #Printer lib.besked, som er den besked vi får fra adafruit fra GPS
+            
+            print(lib.besked)
+            print('Forsvars er ',lib.besked,'m væk')
+            
+            #Printer lib.besked2, som er den besked vi får fra adafruit fra WifiScanner
+            print(lib.besked2)
+            print('forsvars er ',lib.besked2, 'dBm væk')
+                        
+            
+            if lib.besked != "":
+                fA = float(lib.besked)
                 print(fA, type(fA))
                 if fA > distance:
                     offside = True
+                    print(fA, distance,'DET VIRKER!')
+                else:
+                    offside = False
+#går i offside hvis rssi3 er større end rssifloat3 (laver også rssi værdien om til et normalt tal i stedet for et -tal
+            if lib.besked2 != "":
+                rssi = float(lib.besked2)
+                rssi3 = rssi * -1
+                print(rssi3, type(rssi3))
+                if rssifloat3 < rssi3:
+                    offside = True
+                    print(rssifloat3, rssi3, 'DET VIRKER!')
+                    
+            
 
             ledNormBack = True
-            #print(posData)
-            #print("speed: ",speed)
-        #time.sleep(4)
 
         if offside == True and currentTime - previousTimeOffside >= intervalOffside:
             previousTimeOffside = currentTime
@@ -144,22 +175,22 @@ while True:
             print("Potentiel offside pos")
             time.sleep(0.5)
             vibrator.value(0)
-            #offsideTest = offsideTest + 1
+            
             print(offsideTest)
 
-        #if offsideTest > 5:
-            #offside = False
+       
 
         if ledNormBack == True:
             ledNormBack = False
             print("back to normal")
             led.power_on()
-        
+        #disconnecter fra wifi, og scanner efter wifi's
         if currentTime - previousTimeNet >= intervalNet:
             previousTimeNet = currentTime
             station.disconnect();
             print("hello from net")
             ssid = station.scan()
+            #beder vi om RSSI værdien fra netværket LTE-1857 (RRSI er nummer 4 i rækken af værdier vi får når vi scanner)
             for i in ssid:
                 if i[0] == b'LTE-1857':
                     print(i)
@@ -169,7 +200,7 @@ while True:
             #Send rssi value til data_rssi.ujson filen        
             with open('data_rssi.ujson', 'w') as f:
                 ujson.dump(rssi, f)
-            
+            #her resetter vi vores ESP, da den ikke kan komme på wifi igen, efter vi disconnectede den
         if currentTime - previousTimeReset >= intervalReset:
             print("resetter")
             reset()
@@ -185,9 +216,9 @@ while True:
     except OSError as e:
         print('Failed to read sensor.')
     except NameError as e:
-        print('NameError')
+        print('NameError', e)
     except TypeError as e:
-        print('TypeError')
+        print('TypeError', e)
 
     lib.c.check_msg() # needed when publish(qos=1), ping(), subscribe()
     lib.c.send_queue()  # needed when using the caching capabilities for unsent messages
