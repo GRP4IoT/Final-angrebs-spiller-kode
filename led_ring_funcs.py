@@ -2,6 +2,7 @@ from time import sleep, sleep_ms, ticks_ms
 from machine import Pin
 import neopixel
 
+
 n = 12 # antallet af RGB lys på LEDringen
 p = 17 # Den pin LED-ringen er tilsluttet
 
@@ -26,12 +27,14 @@ def uploading():
         np[i] = (6, 6, 29)
         np.write()
     print("Uploading")
+    sleep(2)
     
 def offside():
     for i in range(n):
         np[i] = (44, 0, 0)
         np.write()
     print("Offside")
+    
 
 # cyclus af lys (cirkel løb)
 def low_power():
